@@ -1,0 +1,1259 @@
+﻿@using orchestrator_portal.Dto
+@{
+    ViewData["Title"] = "Create Azure Devops proyects";
+}
+<h1>@ViewData["Title"]</h1>
+<p>Use this page to create proyects in azure </p>
+<hr />
+<table style="width:100%">
+
+<tbody>
+    <tr>
+        <td>
+            <table class="table table-striped table-dark-editable">
+                <tbody>
+                    <tr>
+                        <td style="width:140px">
+                                Project Name
+                        </td>
+                        <td>
+                                <div class="form-field">
+                                    <select id="projectname"
+                                            name="projectname"
+                                            style="width: 100%;">
+                                    </select>
+                                </div>
+                        </td>
+                        <td style="width:220px">
+                                Create/Recreate rbac 
+                                <label class="switch">
+                                    <input type="checkbox" id="recreaterbac">
+                                </label>
+                        </td>
+                        <td style="width:220px">
+                            Include variable groups
+                            <label class="switch">
+                                <input type="checkbox" id="includevargroups">
+                            </label>
+                        </td>
+                        <td style="width:220px">
+                            Recreate project<span style="color: #ef4444; ">(Danger!!)</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="recreate">
+                                </label>
+                        </td>
+                        <td style="width:220px;text-align:right;">                           
+                            Project Repo type
+                        </td>
+                        <td style="width:180px">
+                            <div class="checkbox-list" id="projectTypes">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" value="@RepoType.Code">
+                                    @RepoType.Code
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" value="@RepoType.Infra">
+                                    @RepoType.Infra
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+         </td>
+    </tr>
+    <tr>
+        <td>
+            <table class="table table-striped table-dark-editable">
+
+                <tbody>
+                    <tr>
+                        <td style="width:140px">
+                                Subscriptions
+                        </td>
+                        <td>
+                                <select id="subscriptions"
+                                        name="subscriptions"
+                                        multiple="multiple"
+                                        style="width: 100%;">
+                                </select>
+                                <div id="tablesContainer"></div>
+
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+</tbody>
+</table>
+
+<div id="tablesContainerRepos"></div>
+
+<div id="tablesContainerVargroup"></div>
+
+<div style="margin-top:10px;">
+    <button id="submitBtn" class="action-btn">
+        Download and run pipeline
+    </button>
+</div>
+
+<script>
+    function getFinalServiceConnections() {
+        return $('.final-serviceconnection-name')
+            .map(function () {
+                 const $input = $(this);
+                 const serviceConnectionId = $input.data('serviceconnectionid');
+                 const scopefinalname = $input.data('finalnamescope');
+                 const finalName = $input.val();
+                 const $container = $(`#service-connection-id-${serviceConnectionId}`);
+                 const resources = $container
+                    .find('.form-dynamic-select')
+                    .map(function () {
+
+                        const $select = $(this);
+                        const azureResourceId = $select.val();
+
+                        if (!azureResourceId) return null;
+
+                        const rbac =$(this).data('rbac'); // RBAC column
+
+                        return {
+                            AzureResourceId: azureResourceId,
+                            Rbac: rbac
+                        };
+                    })
+                    .get();
+
+                 return {
+                    //serviceConnectionId: serviceConnectionId,
+                    Name: finalName,
+                    Resources: resources,
+                    Scope: scopefinalname
+                 };
+            })
+            .get();
+    }
+
+        function getFinalVariablegroups() {
+        return $('.final-vargroupid-name')
+            .map(function () {
+                 const $input = $(this);
+                 const vargroupId = $input.data('vargroupid');
+                 const finalName = $input.val();
+                 const $container = $(`#vargroup-id-${vargroupId}`);
+                 const resources = $container
+                    .find('.form-dynamic-input')
+                    .map(function () {
+
+                        const $select = $(this);
+                        const value = $select.val();
+
+                        if (!value) return null;
+
+                        const key =$(this).data('key'); // key column
+
+                        return {
+                            Key: key,
+                            Value: value
+                        };
+                    })
+                    .get();
+
+                 return {
+                    //vargroupId: vargroupId,
+                    Name: finalName,
+                    Resources: resources
+                 };
+            })
+            .get();
+    }
+
+    function removeRepoTable(repoType) {
+        $(`#repo-section-${repoType}`).remove();
+    }
+
+    function removeVargroupTable(repoType) {
+        $('#vargroup-section').remove();
+    }
+
+    function createVargroupTable(repoType) {
+
+        if ($('#vargroup-section').length) return;
+        const html = `
+           <div class="vargroup-section" id="vargroup-section">
+            <hr/>
+            <table style="width:100%">
+                <tr>
+                    <td style="width:300px">
+                        <button type="button"
+                                class="action-btn add-variablegroup-btn"">
+                            Use variable group
+                        </button>
+                    </td>
+                    <td>
+                        <select class="form-dynamic-variablegroup" id="variablegroup" style="width: 100%;"></select>
+                    </td>
+                    <td style="width:600px">
+                        <ul class="info-list">
+                            <li> * Only show Variables groups with key values</li>
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+            <div id="variablegroup-details"></div>
+            </div>
+        `;
+
+        $('#tablesContainerVargroup').append(html);
+
+        $(`#variablegroup`).select2({
+            placeholder: "Select Variable Groups",
+            multiple: false,
+            tags: false,   // allows typing new values
+            closeOnSelect: true, // important
+            allowClear: true,
+            ajax: {
+                url: '/api/variablegroup/select',
+                dataType: 'json',
+                delay: 100,
+                data: function (params) {
+                // params.term contains the search text typed by the user
+                    return {
+                        repoType: repoType
+                    };
+                },
+                processResults: function (data) {
+                    return {
+                        results: data.map(function (item) {
+                            return {
+                                id: item.id,
+                                text: item.name
+                            };
+                        })
+                    };
+                }
+            }
+        });
+
+    }
+
+
+    function createRepoTable(repoType) {
+
+        if ($(`#repo-section-${repoType}`).length) return;
+
+        const html = `
+           <div class="repo-section" id="repo-section-${repoType}">
+            <hr/>
+            <table style="width:100%">
+                <tr>
+                    <td style="width:300px">
+                        <button type="button"
+                                class="action-btn add-serviceconnection-btn"
+                                data-repotype="${repoType}">
+                            Use Service Connection for ${repoType}
+                        </button>
+                    </td>
+                    <td>
+                        <select class="form-dynamic-serviceconnection" id="serviceConnection-${repoType}" data-repotype="${repoType}"" style="width: 100%;"></select>
+                    </td>
+                    <td style="width:600px">
+                        <ul class="info-list">
+                            <li> * Only show Service Connection with at least one resource association </li>
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+            <div id="service-connection-details-${repoType}"></div>
+            </div>
+        `;
+
+        $('#tablesContainerRepos').append(html);
+
+        $(`#serviceConnection-${repoType}`).select2({
+            placeholder: "Select Service connection",
+            multiple: false,
+            tags: false,   // allows typing new values
+            closeOnSelect: true, // important
+            allowClear: true,
+            ajax: {
+                url: '/api/serviceconnection/select',
+                dataType: 'json',
+                delay: 100,
+                data: function (params) {
+                // params.term contains the search text typed by the user
+                    return {
+                        repoType: repoType
+                    };
+                },
+                processResults: function (data) {
+                    return {
+                        results: data.map(function (item) {
+                            return {
+                                id: item.id,
+                                text: item.name,
+                                scopeTemplate: item.scope
+                            };
+                        })
+                    };
+                }
+            }
+        });
+
+    }
+
+     function getSeletedRequiredrepos() {
+        return $('#projectTypes input[type="checkbox"]:checked')
+            .map(function () {
+                return this.value;
+            }).get();
+    }
+
+    function initDynamicSelects() {
+
+        $('.form-dynamic-select').on('select2:unselect', function (e) {
+            //https://github.com/select2/select2/issues/3209
+            if (!e.params.originalEvent) {
+              return;
+            }
+            e.params.originalEvent.stopPropagation();
+            //big code from issue request
+        });
+
+        $('.form-dynamic-select').each(function () {
+
+            const $select = $(this);
+            const resourceType = $select.data('type');
+            const initialId = $select.data('initial-id');
+
+            //if you put in here this is initialized only once when fucntion is called
+            //const subs_selected = $('#subscriptions').val();
+
+            $select.select2({
+                width: '100%',
+                placeholder: `Select Azure Resource (scope: ${resourceType})`,
+                allowClear: true,
+                ajax: {
+                    url: '/api/serviceconnection/' + resourceType,
+                    type: 'POST',
+                    contentType: 'application/json',
+                    delay: 250,
+                    data: function (params) {
+                         return JSON.stringify({
+                            search: params.term || '',
+                            subscriptionIds: $('#subscriptions').val() || [] //to be run jit 
+                        });
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: data.map(item => ({
+                                id: item.id,
+                                text: item.id //thinking in select id but is too large
+                            }))
+                        };
+                    }
+                }
+            });
+
+            if (initialId) {
+                const option = new Option(initialId, initialId, true, true);
+                $select.append(option).trigger('change');
+            }
+        });
+    }
+
+     function fillResourceRows(data, selectedId) {
+        let rowsHtml = '';
+        data.forEach(item => {
+            rowsHtml += `
+                <tr >
+                    <input type="hidden" name="Id" value="${item.id}" />
+                    <td>${item.resourceName}</td>
+                    <td>${item.rbac}</td>
+                    <td>
+                              <select class="form-dynamic-select" name="AzureResourceId" data-rbac="${item.rbac}" data-id="${item.id}" data-type="${item.type}" data-initial-id="${item.azureResourceId}" style="width: 100%;"></select>
+                    </td>
+                </tr>
+            `;
+        });
+
+        $(`#resource-rows-${selectedId}`).html(rowsHtml);
+
+        initDynamicSelects();
+    }
+
+     function fillVargroupRows(data, selectedId) {
+        let rowsHtml = '';
+        data.forEach(item => {
+            rowsHtml += `
+                <tr >
+                    <input type="hidden" name="Id" value="${item.id}" />
+                    <td>${item.key}</td>
+                    <td>      
+                        <input type="text" name="Value" value="${item.value}"  data-id="${item.id}" data-key="${item.key}" class="form-control form-dynamic-input" />
+                    </td>
+                </tr>
+            `;
+        });
+        $(`#vargroup-rows-${selectedId}`).html(rowsHtml);
+    }
+
+    function resolveTemplate(template, project, subscriptions) {
+        let result = template;
+
+        // Replace $project
+        result = result.replace(/\$project/g, project);
+
+        // Replace $subscription[n]
+        result = result.replace(/\$subscriptions\[(\d+)\]/g, (match, index) => {
+            const i = parseInt(index, 10);
+            return subscriptions[i] ?? '';
+        });
+        return result;
+    }
+
+    function getSelectedDeploySubscriptions() {
+        return $('.fordeploy-checkbox:checked')
+            .map(function () {
+                return $(this).data('subscriptionname');
+            }).get();
+    }
+
+    $(document).ready(function () {
+        $('#subscriptions').select2({
+            placeholder: "Select Azure subscriptions",
+            multiple: true,
+            tags: false,   // allows typing new values
+            closeOnSelect: true, // important
+            allowClear: true,
+            ajax: {
+                url: '/api/subscriptions',
+                dataType: 'json',
+                delay: 100,
+                processResults: function (data) {
+                    return {
+                        results: data.map(function (item) {
+                            return {
+                                id: item.subscriptionId,
+                                //first subscription id since all have the same length , uniform dropdown
+                                text: " ( "+item.subscriptionId+" ) "+ item.displayName
+                            };
+                        })
+                    };
+                }
+            }
+        });
+
+        $('#subscriptions').on('select2:unselect', function (e) {
+            const subscriptionId = e.params.data.id;
+
+            //https://github.com/select2/select2/issues/3209
+            if (!e.params.originalEvent) {
+              return;
+            }
+            e.params.originalEvent.stopPropagation();
+            //big code from issue request
+            $(`#table-${subscriptionId}`).remove();
+        });
+
+        $('#subscriptions').on('select2:select', function (e) {
+            //obtain data from processResults
+            const subscriptionId = e.params.data.id;
+            const subscriptionName = e.params.data.text.replace(/^\s*\(.*?\)\s*/, '');
+            $.ajax({
+                url: '/api/subscription/fordeploy',
+                type: 'GET',
+                data: { subscriptionid: subscriptionId },
+                success: function (forDeploy) {
+                    const tableHtml = `
+                            <table class="table table-striped table-dark-editable" id="table-${subscriptionId}">
+                            <tbody>
+                                <tr>
+                                    <td> Use Subscription ${subscriptionName} for deploy </td>
+                                    <td class="checkbox-cell-right" >
+                                    <input type="checkbox"
+                                        class="fordeploy-checkbox"
+                                        data-subscriptionid="${subscriptionId}"
+                                        data-subscriptionname="${subscriptionName}"
+                                        ${forDeploy ? 'checked' : ''}>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            </table>`;
+
+                    $('#tablesContainer').append(tableHtml);
+                }
+            });
+        });
+
+
+        $(document).on('change', '.fordeploy-checkbox', function () {
+            const subscriptionid = $(this).data('subscriptionid');
+            const forDeploy = $(this).is(':checked');
+            $.ajax({
+                url: '/api/subscription/fordeploy',
+                type: 'POST',
+                data: {
+                    subscriptionid: subscriptionid,
+                    fordeploy: forDeploy
+                },
+                success: function () {
+                },
+                error: function () {
+                }
+            });
+        });
+
+       $(document).on('click', '.remove-serviceconnection-btn', function () {
+           selectedId=$(this).data('serviceconnectionid');
+           $(`#service-connection-id-${selectedId}`).remove();
+       })
+
+       $(document).on('click', '.remove-vargroupid-btn', function () {
+           selectedId=$(this).data('vargroupid');
+           $(`#vargroup-id-${selectedId}`).remove();
+       })
+
+       $(document).on('click', '.refresh-vargroupid-btn', function () {
+            const selectedId=$(this).data('vargroupid');
+            const selectedName = $(this).data('template');
+            const $oldTable = $(`#vargroup-id-${selectedId}`);
+
+            const project_selected = $('#projectname').val();
+            //not all the subscription are used to deploy, i need to get this value from the checkbox selectedId not from the selected subscription
+            const subs_selected = getSelectedDeploySubscriptions();
+            const finalName = resolveTemplate( selectedName,project_selected, subs_selected);
+
+            //to not allow create a new table using the same service connection id
+            //in this case we ignore it since wewill rewrite the html, no append involved
+            //if ($(`#vargroup-id-${selectedId}`).length) return;
+
+            $.ajax({
+                url: '/api/vargroup/getbyid',
+                type: 'GET',
+                data: { id: selectedId },
+                success: function (value) {
+                    const html = `
+                        <table style="width:100%" id="vargroup-id-${selectedId}">
+                            <body>
+                                <tr>
+                                    <td Style="width:15px;" > * </td>
+                                    <td>
+                                        <table class="table table-striped table-dark-editable">
+                                            <tbody>
+                                                <tr>
+                                                    <td style="width:220px"> Variable group template </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        name="Name"
+                                                        value="${selectedName}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Variable group</td>
+                                                    <td>
+                                                        <input type="text"
+                                                        name="Name"
+                                                        value="${finalName}"
+                                                        data-vargroupid="${selectedId}"
+                                                        class="form-control final-vargroupid-name" readonly/>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn save-vargroupid-btn"
+                                                            data-vargroupid="${selectedId}">
+                                                        Save
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn refresh-vargroupid-btn"
+                                                            data-vargroupid="${selectedId}"
+                                                            data-template="${selectedName}">
+                                                        Refresh
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                    <button type="button"
+                                                            class="action-btn remove-vargroupid-btn"
+                                                            data-vargroupid="${selectedId}">
+                                                        Remove
+                                                    </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td> </td>
+                                    <td>
+                                        <table class=" table table-striped table-dark-editable">
+                                            <thead>
+                                            <tr>
+                                                <th style="width:240px"> Key</th>
+                                                <th style="width:240px"> Value</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="vargroup-rows-${selectedId}">
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    //$('#variablegroup-details').append(html);
+                    $oldTable.replaceWith(html);
+                    fillVargroupRows(value, selectedId);
+                }
+            });
+       })
+
+       $(document).on('click', '.refresh-serviceconnection-btn', function () {
+            const selectedId=$(this).data('serviceconnectionid');
+            const repoType = $(this).data('repotype');
+            const selectedName = $(this).data('template');
+            const selectedScopeName = $(this).data('scopetemplate');
+
+            const $oldTable = $(`#service-connection-id-${selectedId}`);
+            const project_selected = $('#projectname').val();
+            //not all the subscription are used to deploy, i need to get this value from the checkbox selectedId not from the selected subscription
+            const subs_selected = getSelectedDeploySubscriptions();
+            const finalName = resolveTemplate( selectedName,project_selected, subs_selected);
+            const finalNameScope = resolveTemplate( selectedScopeName,project_selected, subs_selected);
+
+            //to not allow create a new table using the same service connection id
+            //in this case we ignore it since wewill rewrite the html, no append involved
+            //if ($(`#service-connection-id-${selectedId}`).length) return;
+
+            $.ajax({
+                url: '/api/serviceconnection/getbyid',
+                type: 'GET',
+                data: { id: selectedId },
+                success: function (value) {
+                    const html = `
+                        <table style="width:100%" id="service-connection-id-${selectedId}">
+                            <body>
+                                <tr>
+                                    <td Style="width:15px;" > * </td>
+                                    <td>
+                                        <table class="table table-striped table-dark-editable">
+                                            <tbody>
+                                                <tr>
+                                                    <td style="width:220px"> Service Connection template </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${selectedName}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Service Connection </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${finalName}"
+                                                        data-serviceconnectionid="${selectedId}"
+                                                        data-finalnamescope="${finalNameScope}"
+                                                        class="form-control final-serviceconnection-name" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Scope template </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${selectedScopeName}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Scope </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${finalNameScope}"
+                                                        data-serviceconnectionid="${selectedId}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn save-serviceconnection-btn"
+                                                            data-serviceconnectionid="${selectedId}">
+                                                        Save
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn refresh-serviceconnection-btn"
+                                                            data-serviceconnectionid="${selectedId}"
+                                                            data-template="${selectedName}"
+                                                            data-scopetemplate="${selectedScopeName}"
+                                                            data-repotype="${repoType}">
+                                                        Refresh
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                    <button type="button"
+                                                            class="action-btn remove-serviceconnection-btn"
+                                                            data-serviceconnectionid="${selectedId}">
+                                                        Remove
+                                                    </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td> </td>
+                                    <td>
+                                        <table class=" table table-striped table-dark-editable">
+                                            <thead>
+                                            <tr>
+                                                <th style="width:240px"> Resource name </th>
+                                                <th style="width:240px"> Resurce Rbac </th>
+                                                <th> Azure Resource Id </th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="resource-rows-${selectedId}">
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    //$(`#service-connection-details-${repoType}`).append(html);
+                    $oldTable.replaceWith(html);
+                    fillResourceRows(value, selectedId);
+                    }
+            });
+       })
+
+        $(document).on('click', '.save-serviceconnection-btn', function () {
+            selectedId=$(this).data('serviceconnectionid');
+            const results = [];
+            let hasEmptyValue = false;
+            // Scope ONLY to this service connection block
+            $(`#service-connection-id-${selectedId}`)
+                .find('.form-dynamic-select')
+                .each(function () {
+
+                    const resourceAssociationId = $(this).data('id');
+                    const azureResourceId = $(this).val(); // Select2-safe
+                    // Skip empty selections
+                    if (!azureResourceId) {
+                        hasEmptyValue = true;
+                        return false; //
+                    }
+
+                    results.push({
+                        resourceAssociationId: resourceAssociationId,
+                        azureResourceId: azureResourceId,
+                        serviceConnectionId: selectedId
+                    });
+            });
+
+            if (hasEmptyValue) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing Azure Resource',
+                    text: 'Please select an Azure Resource for every row before saving.',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            //console.log('Collected values:', results);
+            if (results.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing Azure Resource',
+                    text: 'Please select an Azure Resource before continuing.',
+                    confirmButtonText: 'OK'
+                });
+            }
+
+            $.ajax({
+                url: '/api/serviceconnection/saveresources',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(results),
+                success: function () {
+                    Swal.fire({
+                        title: 'Saved!',
+                        text: 'Service connection resources updated.',
+                        icon: 'success',
+                        background: '#2f2f2f',
+                        color: '#fff'
+                    });
+                },
+                error: function () {
+                    Swal.fire({
+                        title: 'Error',
+                        text: 'Failed to save resources',
+                        icon: 'error',
+                        background: '#2f2f2f',
+                        color: '#fff'
+                    });
+                }
+            });
+       })
+
+       $(document).on('click', '.save-vargroupid-btn', function () {
+            selectedId=$(this).data('vargroupid');
+            const results = [];
+            let hasEmptyValue = false;
+
+            $(`#vargroup-id-${selectedId}`).find('.form-dynamic-input').each(function () {
+                const vargroupAssociationId = $(this).data('id');
+                const value = $(this).val(); // Select2-safe
+                // Skip empty selections
+                if (!value) {
+                    hasEmptyValue = true;
+                    return false; //
+                }
+
+                results.push({
+                    id: vargroupAssociationId,
+                    value: value
+                });
+            });
+
+            if (hasEmptyValue) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing Values',
+                    text: 'Please select a value for variable group.',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            //console.log('Collected values:', results);
+            if (results.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing Values',
+                    text: 'Please select a value for variable group.',
+                    confirmButtonText: 'OK'
+                });
+            }
+
+            $.ajax({
+                url: '/api/vargroup/saveresources',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(results),
+                success: function () {
+                    Swal.fire({
+                        title: 'Saved!',
+                        text: 'variable group resources updated.',
+                        icon: 'success',
+                        background: '#2f2f2f',
+                        color: '#fff'
+                    });
+                },
+                error: function () {
+                    Swal.fire({
+                        title: 'Error',
+                        text: 'Failed to save resources',
+                        icon: 'error',
+                        background: '#2f2f2f',
+                        color: '#fff'
+                    });
+                }
+            });
+       })
+
+        $(document).on('click', '.add-variablegroup-btn', function () {
+            const selectedId = $('#variablegroup').val();
+            const selectedName = $('#variablegroup').find('option:selected').text();
+            const project_selected = $('#projectname').val();
+            //not all the subscription are used to deploy, i need to get this value from the checkbox selectedId not from the selected subscription
+            const subs_selected = getSelectedDeploySubscriptions();
+            const finalName = resolveTemplate( selectedName,project_selected, subs_selected);
+            //aqui
+            //to not allow create a new table using the same service connection id
+            if ($(`#vargroup-id-${selectedId}`).length) return;
+
+            $.ajax({
+                url: '/api/vargroup/getbyid',
+                type: 'GET',
+                data: { id: selectedId },
+                success: function (value) {
+                    const html = `
+                        <table style="width:100%" id="vargroup-id-${selectedId}">
+                            <body>
+                                <tr>
+                                    <td Style="width:15px;" > * </td>
+                                    <td>
+                                        <table class="table table-striped table-dark-editable">
+                                            <tbody>
+                                                <tr>
+                                                    <td style="width:220px"> Variable group template </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${selectedName}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Variable group</td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${finalName}"
+                                                        data-vargroupid="${selectedId}"
+                                                        class="form-control final-vargroupid-name" readonly/>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn save-vargroupid-btn"
+                                                            data-vargroupid="${selectedId}">
+                                                        Save
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn refresh-vargroupid-btn"
+                                                            data-vargroupid="${selectedId}"
+                                                            data-template="${selectedName}">
+                                                        Refresh
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                    <button type="button"
+                                                            class="action-btn remove-vargroupid-btn"
+                                                            data-vargroupid="${selectedId}">
+                                                        Remove
+                                                    </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td> </td>
+                                    <td>
+                                        <table class=" table table-striped table-dark-editable">
+                                            <thead>
+                                            <tr>
+                                                <th style="width:240px"> Key</th>
+                                                <th style="width:240px"> Value</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="vargroup-rows-${selectedId}">
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    $('#variablegroup-details').append(html);
+                    fillVargroupRows(value, selectedId);
+                }
+            });
+        });
+
+        $(document).on('click', '.add-serviceconnection-btn', function () {
+            const repoType = $(this).data('repotype');
+            const selectedId = $(`#serviceConnection-${repoType}`).val();
+            const selectedOption =$(`#serviceConnection-${repoType}`).select2('data')[0];
+            const selectedName = selectedOption.text;
+            const project_selected = $('#projectname').val();
+            const selectedScopeName = selectedOption.scopeTemplate;
+
+            //not all the subscription are used to deploy, i need to get this value from the checkbox selectedId not from the selected subscription
+            const subs_selected = getSelectedDeploySubscriptions();
+            const finalName = resolveTemplate( selectedName,project_selected, subs_selected);
+            const finalNameScope = resolveTemplate( selectedScopeName,project_selected, subs_selected);
+
+            //to not allow create a new table using the same service connection id
+            if ($(`#service-connection-id-${selectedId}`).length) return;
+
+            $.ajax({
+                url: '/api/serviceconnection/getbyid',
+                type: 'GET',
+                data: { id: selectedId },
+                success: function (value) {
+                    const html = `
+                        <table style="width:100%" id="service-connection-id-${selectedId}">
+                            <body>
+                                <tr>
+                                    <td Style="width:15px;" > * </td>
+                                    <td>
+                                        <table class="table table-striped table-dark-editable">
+                                            <tbody>
+                                                <tr>
+                                                    <td style="width:220px"> Service Connection template </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${selectedName}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Service Connection </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${finalName}"
+                                                        data-serviceconnectionid="${selectedId}"
+                                                        data-finalnamescope="${finalNameScope}"
+                                                        class="form-control final-serviceconnection-name" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Scope template </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${selectedScopeName}"
+                                                        class="form-control" readonly/>
+                                                    </td>
+                                                    <td style="width:160px"> Scope </td>
+                                                    <td>
+                                                        <input type="text"
+                                                        value="${finalNameScope}"
+                                                        data-serviceconnectionid="${selectedId}"
+                                                        class="form-control " readonly/>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn save-serviceconnection-btn"
+                                                            data-serviceconnectionid="${selectedId}">
+                                                        Save
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                        <button type="button"
+                                                            class="action-btn refresh-serviceconnection-btn"
+                                                            data-serviceconnectionid="${selectedId}"
+                                                            data-template="${selectedName}"
+                                                            data-scopetemplate="${selectedScopeName}"
+                                                            data-repotype="${repoType}">
+                                                        Refresh
+                                                    </button>
+                                                    </td>
+                                                    <td style="width:80px">
+                                                    <button type="button"
+                                                            class="action-btn remove-serviceconnection-btn"
+                                                            data-serviceconnectionid="${selectedId}">
+                                                        Remove
+                                                    </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td> </td>
+                                    <td>
+                                        <table class=" table table-striped table-dark-editable">
+                                            <thead>
+                                            <tr>
+                                                <th style="width:240px"> Resource name </th>
+                                                <th style="width:240px"> Resurce Rbac </th>
+                                                <th> Azure Resource Id </th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="resource-rows-${selectedId}">
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    $(`#service-connection-details-${repoType}`).append(html);
+                    fillResourceRows(value, selectedId);
+                }
+            });
+        });
+
+        document.getElementById("includevargroups").addEventListener("change", function () {
+            if (this.checked) {
+                createVargroupTable();
+            } else {
+                removeVargroupTable();
+            }
+        });
+
+        $(document).on('change', '#projectTypes input[type="checkbox"]', function () {
+            const repoType = $(this).val();
+            const isChecked = $(this).is(':checked');
+            if (isChecked) {
+                createRepoTable(repoType);
+            } else {
+                removeRepoTable(repoType);
+            }
+        });
+
+        $('#projectname').select2({
+            placeholder: "Select or type a project name",
+            allowClear: true,
+            tags: true,   // allows typing new values
+            multiple: false,  // single selection only
+            ajax: {
+                url: '/api/projects',
+                dataType: 'json',
+                delay: 100,
+                cache: false, // <--- disable caching
+                data: function (params) {
+                // params.term contains the search text typed by the user
+                    return {
+                        search: params.term || ''                   
+                    };
+                },
+                processResults: function (data) {
+                    const results = Array.isArray(data) ? data : [];
+                    return {
+                        results: results.map(item => ({ id: item, text: item }))
+                    };
+                }
+            },
+            createTag: function (params) {
+                const term = $.trim(params.term);
+                if (term === '') {
+                    return null;
+                }
+
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            }
+        });
+
+        $('#submitBtn').on('click', function () {
+            //not all the subscription are used to deploy, i need to get this value from the checkbox selectedId not from the selected subscription
+            const subs_selected = getSelectedDeploySubscriptions() ;
+            const project_selected = $('#projectname').val();
+            const requiredrepos = getSeletedRequiredrepos();
+            const createrbac = $('#recreaterbac').prop('checked').toString(); // true / false
+            const recreate = $('#recreate').prop('checked').toString(); // true / false
+            const serviceConnections = getFinalServiceConnections();
+            const variablegroups = getFinalVariablegroups();
+
+            if (requiredrepos.length === 0) {
+                Swal.fire({
+                    title: 'Info required!',
+                    text: 'Select at least one project repo type.',
+                    icon: 'info',
+                    background: '#2f2f2f',  // dark background
+                    color: '#fff',           // text color
+                    timer: 2000,       // auto-close after 2s
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+            if (subs_selected.length === 0) {
+                Swal.fire({
+                    title: 'Info required!',
+                    text: 'Select at least one subscription name.',
+                    icon: 'info',
+                    background: '#2f2f2f',  // dark background
+                    color: '#fff',           // text color
+                    timer: 2000,       // auto-close after 2s
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+            if (!project_selected) {
+                Swal.fire({
+                    title: 'Info required!',
+                    text: 'Select at least one project name.',
+                    icon: 'info',
+                    background: '#2f2f2f',  // dark background
+                    color: '#fff',           // text color
+                    timer: 2000,       // auto-close after 2s
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+            const options = {
+                recreate_project: recreate,
+                project_name: project_selected,
+                create_rbac: createrbac
+            };
+
+            const payload = {
+                serviceConnections: serviceConnections,
+                variablegroups: variablegroups,
+                subscriptions: subs_selected,
+                requiredrepos: requiredrepos,
+                options: options ,
+            };
+
+            const btn = document.getElementById("submitBtn");
+
+            // Disable immediately to prevent double-clicks
+            btn.disabled = true;
+
+            console.log(payload);
+            const safeProjectName = project_selected.trim().replace(/[^a-zA-Z0-9-_]/g, '_');
+            const jsonPayload = JSON.stringify(payload, null, 2);
+            const blob = new Blob([jsonPayload], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${safeProjectName}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            sendData(payload);
+        });
+
+        function sendData(payload) {
+            $.ajax({
+                url: '/api/data/selected',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function () {
+                    //alert('Saved!');
+                },
+                error: function (err) {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: err,
+                        icon: 'error',
+                        background: '#2f2f2f',  // dark background
+                        color: '#fff',           // text color
+                        //timer: 2000,       // auto-close after 2s
+                        showConfirmButton: true
+                    });
+                },
+                complete: function () {
+                    const btn = document.getElementById("submitBtn");
+
+                    // Re-enable after 10 seconds
+                    setTimeout(() => {
+                        btn.disabled = false;
+                    }, 10000); // 10000ms = 10 seconds
+                },
+                success: function (response) {
+                    if (response.htmlcode == 200)
+                    {
+                        Swal.fire({
+                            title: 'Success!',
+                            text: response.message,
+                            icon: 'success',
+                            background: '#2f2f2f',  // dark background
+                            color: '#fff',           // text color
+                            //timer: 2000,       // auto-close after 2s
+                            showConfirmButton: true
+                        });
+                    }
+                    else
+                    {
+                        Swal.fire({
+                            title: 'Warning!',
+                            text: response.message,
+                            icon: 'warning',
+                            background: '#2f2f2f',  // dark background
+                            color: '#fff',           // text color
+                            //timer: 2000,       // auto-close after 2s
+                            showConfirmButton: true
+                        });
+                    }
+                }
+            });
+        }
+    });
+</script>

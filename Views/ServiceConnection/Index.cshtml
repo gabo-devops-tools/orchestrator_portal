@@ -1,0 +1,282 @@
+﻿@using orchestrator_portal.Dto
+@model ServiceConnectionVm
+
+<h2>Service Connections</h2>
+
+<ul class="info-list">
+    <li> * Changes in service connections repo types will detach them from all existing resource association  if is neccesary </li>
+    <li> * Its posible to use variable like $project or $subscriptions[i] to reference inputs</li>
+
+</ul>
+<hr />
+<button type="button" id="addResourceBtn" class="action-btn">
+    Add Resource
+</button>
+
+<table class="tomodify table table-striped table-dark-editable">
+    <thead>
+        <tr>
+            <th> Suffix Name</th>
+            <th> Scope</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.ServiceConnection)
+        {
+            <tr>
+                <input type="hidden" name="Id" value="@item.Id" />
+                <td>
+                    <input type="text"
+                           name="Name"
+                           value="@item.Name"
+                           class="form-control" />
+                </td>
+                <td>
+                    <input type="text"
+                           name="Scope"
+                           value="@item.Scope"
+                           class="form-control" />
+                </td>
+                <td class="rbac-class">
+                    <select name="Repotype" class="form-select">
+                        @foreach (var type in Model.RepoType)
+                        {
+                            <option value="@type" selected="@(type == item.RepoType.ToString())"> @type </option>
+                        }
+                    </select>
+                </td>
+                <td>
+                    <input type="text"
+                           name="Description"
+                           value="@item.Description"
+                           class="form-control" />
+                </td>
+                <td class="td-button">
+                    <button type="submit" class="action-btn saveRowBtn">Update</button>
+                </td>
+                <td class="td-button">
+                    <button type="submit" class="action-btn removeRowBtn">X</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<table style="display:none">
+    <tbody>
+        <tr id="resource-row-template">
+            <input type="hidden" name="Id" value="0" />
+            <td>
+                <input type="text" name="Name" class="form-control" />
+            </td>
+            <td>
+                <input type="text" name="Scope" class="form-control" />
+            </td>
+            <td class="rbac-class">
+                <select name="Repotype" class="form-dynamic-select">
+                    @foreach (var type in Model.RepoType)
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+            </td>
+            <td>
+                <input type="text" name="Description" class="form-control" />
+            </td>
+            <td class="td-button">
+                <button type="submit" class="action-btn saveRowBtn">Save</button>
+            </td>
+            <td class="td-button">
+                <button type="button" class="action-btn CancelRowBtn">X</button>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<button type="button" id="UpdateAllBtn" class="action-btn">
+    Update All Resource
+</button>
+
+<script>
+    $(document).ready(function () {
+         $('.form-select').select2({
+            width: '100%'
+        });
+
+        $(document).on('click', '.saveRowBtn', function () {
+            let hasError = false;
+
+            const $row = $(this).closest('tr');
+
+            const name = $row.find('input[name="Name"]').val();
+            const scope = $row.find('input[name="Scope"]').val();
+            const description = $row.find('input[name="Description"]').val();
+            const repoType = $row.find('select[name="Repotype"]').val();
+
+            if (!name || !description || !repoType || !scope) {
+                Swal.fire({
+                    title: 'Missing information',
+                    text: 'Please fill in all fields before updating.',
+                    icon: 'warning',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    showConfirmButton: true
+                });
+                return;
+            }
+
+            const payload = {
+                Id : $row.find('input[name="Id"]').val(),
+                Name: name,
+                Scope: scope,
+                Description: description,
+                Repotype: repoType
+            };
+
+            $.ajax({
+                url: '/ServiceConnection/Save',
+                type: 'POST',
+                data: payload,
+                success: function () {
+                    //alert('Saved!');
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Save failed');
+                    Swal.fire({
+                        title: 'Duplicate Value',
+                        text: 'Name already exists.',
+                        icon: 'error',
+                        background: '#2f2f2f',
+                        color: '#fff',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            });
+        });
+
+
+         $(document).on('click', '.CancelRowBtn', function () {
+             location.reload();
+         })
+
+         $(document).on('click', '.removeRowBtn', function () {
+            const $row = $(this).closest('tr');
+
+             const payload = {
+                Id : $row.find('input[name="Id"]').val()
+            };
+
+            $.ajax({
+                url: '/ServiceConnection/Delete',
+                type: 'POST',
+                data: payload,
+                success: function () {
+                    //alert('Saved!');
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Save failed');
+                }
+            });
+         })
+
+       $('#addResourceBtn').on('click', function () {
+            const $template = $('#resource-row-template').clone();
+            $template.removeAttr('id');
+            $template.show();
+
+            console.log($template)
+
+            $('table.tomodify tbody').append($template);
+
+            $('.form-dynamic-select').select2({
+                width: '100%'
+            });
+            $('#addResourceBtn').prop('disabled', true);
+            $('#UpdateAllBtn').prop('disabled', true);
+       });
+
+
+       $('#UpdateAllBtn').on('click', function () {
+            const serviceconnections = [];
+            let hasError = false;
+
+            $('table.tomodify tbody tr').each(function () {
+                const $row = $(this);
+
+                // Skip empty template rows if any
+                const id = $row.find('input[name="Id"]').val();
+                if (!id) return;
+
+                const name = $row.find('input[name="Name"]').val();
+                const scope = $row.find('input[name="Scope"]').val();
+                const description = $row.find('input[name="Description"]').val();
+                const repoType = $row.find('select[name="Repotype"]').val();
+
+                if (!name || !description || !repoType || !scope ) {
+                    hasError = true;
+                    return false; // break .each()
+                }
+
+                serviceconnections.push({
+                    Id: id,
+                    Name: name,
+                    Scope: scope,
+                    Description: description,
+                    RepoType: repoType
+                });
+            });
+
+            if (hasError) {
+                Swal.fire({
+                    title: 'Missing information',
+                    text: 'Please fill in all fields before updating.',
+                    icon: 'warning',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    showConfirmButton: true
+                });
+                return;
+            }
+
+            if (serviceconnections.length === 0) {
+                Swal.fire({
+                    title: 'Nothing to update',
+                    text: 'No valid service connections were found.',
+                    icon: 'info',
+                    background: '#2f2f2f',
+                    color: '#fff'
+                });
+                return;
+            }
+
+            $.ajax({
+                url: '/ServiceConnection/UpdateAll',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(serviceconnections),
+                success: function () {
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Update all failed');
+                    Swal.fire({
+                        title: 'Duplicate Value',
+                        text: 'Name already exists.',
+                        icon: 'error',
+                        background: '#2f2f2f',
+                        color: '#fff',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            });
+       });
+    })
+</script>

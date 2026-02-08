@@ -1,0 +1,84 @@
+﻿/* ===== Dark Editable Table ===== */
+.table-dark-editable {
+    background-color: #1e1e1e;
+    color: #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+}
+
+    .table-dark-editable thead {
+        background-color: #111827;
+    }
+
+    .table-dark-editable th {
+        color: #9ca3af;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #374151;
+    }
+
+    .table-dark-editable td {
+        vertical-align: middle;
+        border-top: 1px solid #374151;
+    }
+
+    /* Inputs */
+    .table-dark-editable input[type="text"] {
+        background-color: #000;
+        border: 1px solid #374151;
+        border-radius: 6px;
+        height: 24px;
+        color: #e5e7eb;
+        width: 95%;
+    }
+
+        .table-dark-editable input[type="text"]:focus {
+            background-color: #020617;
+            border-color: #3b82f6;
+            box-shadow: none;
+            color: #fff;
+        }
+
+    /* Checkboxes */
+    .table-dark-editable input[type="checkbox"] {
+        transform: scale(1.2);
+        accent-color: #3b82f6;
+
+    }
+
+    .table-dark-editable td.checkbox-cell {
+        text-align: center;
+        vertical-align: middle;
+        width: 80px;
+    }
+
+    .table-dark-editable td.checkbox-cell-right {
+        text-align: right;
+        vertical-align: middle;
+        width: 80px;
+    }
+
+    .table-dark-editable td.select-cell {
+        width: 360px; /* choose once */
+        max-width: 360px;
+    }
+
+    .table-dark-editable td.td-button {
+        width: 50px;
+    }
+
+    /* Row hover 
+    .table-dark-editable tbody tr:hover {
+        background-color: #020617;
+    }*/
+
+    /* Rounded corners */
+    .table-dark-editable thead tr th:first-child {
+        border-top-left-radius: 8px;
+    }
+
+    .table-dark-editable thead tr th:last-child {
+        border-top-right-radius: 8px;
+    }

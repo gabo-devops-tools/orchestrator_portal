@@ -1,0 +1,394 @@
+﻿@{
+    ViewData["Title"] = "Settings";
+}
+<h1>@ViewData["Title"]</h1>
+
+<p>Settings</p>
+
+<ul class="info-list">
+    <li> * Organization need to be introduced , Azure doesnt provided a metadata endpoint to discover all the organization a user have access to </li>
+    <li> * Only validate organization that are visible to the user logged (user registered in azure devops organization as least as basic users) </li>
+    <li> * Only show projects that are visible to the user logged (user at least added to [Project]\Readers ) </li>
+</ul>
+<hr />
+<table class="table-dark-editable">
+    <tbody>
+        <tr>
+            <td style="width:180px">
+                Organizations
+            </td>
+            <td>
+                <select id="organizationspicker"
+                        name="organizationspicker"
+                        style="width: 100%;">
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Automation Project Name
+            </td>
+            <td>
+                <select id="autoprojectname"
+                        name="autoprojectname"
+                        style="width: 100%;">
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Terraform Project Name
+            </td>
+            <td>
+                <select id="terraprojectname"
+                        name="terraprojectname"
+                        style="width: 100%;">
+                </select>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<button id="saveSettingsBtn" class="action-btn">
+    Save
+</button>
+<script>
+
+    $(document).ready(function () {
+
+        $('#autoprojectname').select2({
+            placeholder: "Select or type a project name",
+            allowClear: true,
+            tags: false,   // allows typing new values
+            multiple: false,  // single selection only
+            ajax: {
+                url: '/api/Settings/projects',
+                dataType: 'json',
+                delay: 100,
+                cache: false, // <--- disable caching
+                data: function (params) {
+                // params.term contains the search text typed by the user
+                    return {
+                        search: params.term || '',
+                        organization: $('#organizationspicker').val(),
+                        project_to_exclude: $('#terraprojectname').val()
+                    };
+                },
+                processResults: function (data) {
+                    const results = Array.isArray(data) ? data : [];
+                    return {
+                        results: results.map(item => ({ id: item, text: item }))
+                    };
+                }
+            },
+            createTag: function (params) {
+                const term = $.trim(params.term);
+                if (term === '') {
+                    return null;
+                }
+
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            }
+        });
+
+        $('#terraprojectname').select2({
+            placeholder: "Select or type a project name",
+            allowClear: true,
+            tags: false,   // allows typing new values
+            multiple: false,  // single selection only
+            ajax: {
+                url: '/api/Settings/projects',
+                dataType: 'json',
+                delay: 100,
+                cache: false, // <--- disable caching
+                data: function (params) {
+                // params.term contains the search text typed by the user
+                    return {
+                        search: params.term || '',
+                        organization: $('#organizationspicker').val(),
+                        project_to_exclude: $('#autoprojectname').val()
+                    };
+                },
+                processResults: function (data) {
+                    const results = Array.isArray(data) ? data : [];
+                    return {
+                        results: results.map(item => ({ id: item, text: item }))
+                    };
+                }
+            },
+            createTag: function (params) {
+                const term = $.trim(params.term);
+                if (term === '') {
+                    return null;
+                }
+
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            }
+        });
+
+        $.ajax({
+            url: '/api/organizations/default', // your endpoint returning the default org
+            type: 'GET',
+            success: function(defaultOrg) {
+                if (defaultOrg) {
+                    // Create a new option element and set it as selected
+                    const option = new Option(defaultOrg, defaultOrg, true, true);
+                    $('#organizationspicker').append(option).trigger('change');
+                }
+            }
+        });
+
+        $.ajax({
+            url: '/api/project/automation/default', // your endpoint returning the default org
+            type: 'GET',
+            success: function(defaultOrg) {
+                if (defaultOrg) {
+                    // Create a new option element and set it as selected
+                    const option = new Option(defaultOrg, defaultOrg, true, true);
+                    $('#autoprojectname').append(option).trigger('change');
+                }
+            }
+        });
+
+         $.ajax({
+            url: '/api/project/terraform/default', // your endpoint returning the default org
+            type: 'GET',
+            success: function(defaultOrg) {
+                if (defaultOrg) {
+                    // Create a new option element and set it as selected
+                    const option = new Option(defaultOrg, defaultOrg, true, true);
+                    $('#terraprojectname').append(option).trigger('change');
+                }
+            }
+        });
+
+        $('#organizationspicker').select2({
+            placeholder: "Select or type a organization name",
+            allowClear: true,
+            tags: true,         // allows typing new values
+            multiple: false,   // single selection only
+            ajax: {
+                url: '/api/organizations',
+                dataType: 'json',
+                delay: 100,
+                cache: false,
+                data: function (params) {
+                    // params.term contains the search text typed by the user
+                    return {
+                        search: params.term   // <-- send as "search"
+                    };
+                },
+                processResults: function (data) {
+                    // data might be empty
+                    const results = Array.isArray(data) ? data : [];
+                    return {
+                         results: results.map(item => ({
+                            id: item,
+                            text: item
+                         }))
+                    };
+                }
+            },
+            createTag: function (params) {
+                const term = $.trim(params.term);
+                if (term === '') {
+                    return null;
+                }
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            }
+        });
+
+        // Listen to selection
+        $('#organizationspicker').on('select2:select', async function(e){
+            const data = e.params.data;
+            // Only save if it's a new tag
+            if (data.newTag) {
+                fetch('/api/organizations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: data.text ,
+                        IsActive : false,
+                        AutomationProjectname : "None",
+                        terraformProjectname : "None"
+                    })
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to save organization');
+                    console.log('Organization saved to DB:', data.text);
+                })
+                .catch(err => console.error(err));
+            }
+
+            // Destroy and recreate project select2 to fully reset
+            $('#autoprojectname').select2('destroy');
+
+            $('#autoprojectname').val(null).empty(); // clear selection and options
+
+            $('#autoprojectname').select2({
+                placeholder: "Select or type a project name",
+                allowClear: true,
+                tags: false,
+                multiple: false,
+                ajax: {
+                    url: '/api/Settings/projects',
+                    dataType: 'json',
+                    delay: 100,
+                    cache: false,
+                    data: function (params) {
+                        return {
+                            search: params.term || '',
+                            organization: $('#organizationspicker').val(),
+                            project_to_exclude: $('#terraprojectname').val() || ''
+                        };
+                    },
+                    processResults: function (data) {
+                        const results = Array.isArray(data) ? data : [];
+                        return {
+                            results: results.map(item => ({ id: item, text: item }))
+                        };
+                    }
+                },
+                createTag: function (params) {
+                    const term = $.trim(params.term);
+                    if (term === '') return null;
+                    return { id: term, text: term, newTag: true };
+                }
+                });
+
+            $('#terraprojectname').select2('destroy');
+
+            $('#terraprojectname').val(null).empty(); // clear selection and options
+
+            $('#terraprojectname').select2({
+                placeholder: "Select or type a project name",
+                allowClear: true,
+                tags: false,
+                multiple: false,
+                ajax: {
+                    url: '/api/Settings/projects',
+                    dataType: 'json',
+                    delay: 100,
+                    cache: false,
+                    data: function (params) {
+                        return {
+                            search: params.term || '',
+                            organization: $('#organizationspicker').val(),
+                            project_to_exclude: $('#autoprojectname').val() || ''
+
+                        };
+                    },
+                    processResults: function (data) {
+                        const results = Array.isArray(data) ? data : [];
+                        return {
+                            results: results.map(item => ({ id: item, text: item }))
+                        };
+                    }
+                },
+                createTag: function (params) {
+                    const term = $.trim(params.term);
+                    if (term === '') return null;
+                    return { id: term, text: term, newTag: true };
+                }
+                });
+        });
+
+        $('#saveSettingsBtn').on('click', function () {
+            const org_selected = $('#organizationspicker').val();
+            const project_selected = $('#autoprojectname').val();
+            const terraform_project_selected = $('#terraprojectname').val();
+
+             if (!org_selected) {
+                Swal.fire({
+                    title: 'Info required!',
+                    text: 'Select at least one organization name.',
+                    icon: 'info',
+                    background: '#2f2f2f',  // dark background
+                    color: '#fff',           // text color
+                    timer: 2000,       // auto-close after 2s
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+             if (!project_selected) {
+                Swal.fire({
+                    title: 'Info required!',
+                    text: 'Select at least one project name.',
+                    icon: 'info',
+                    background: '#2f2f2f',  // dark background
+                    color: '#fff',           // text color
+                    timer: 2000,       // auto-close after 2s
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+            const payload = {
+                org: org_selected,
+                project: project_selected,
+                terraform_project: terraform_project_selected
+            };
+
+            const btn = document.getElementById("saveSettingsBtn");
+            // Disable immediately to prevent double-clicks
+            btn.disabled = true;
+
+
+            sendSettingsData(payload);
+        });
+
+        function sendSettingsData(payload) {
+            $.ajax({
+                url: '/api/settings/selected',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function () {
+                    //alert('Saved!');
+                },
+                error: function (err) {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: err,
+                        icon: 'error',
+                        background: '#2f2f2f',  // dark background
+                        color: '#fff',           // text color
+                        timer: 2000,       // auto-close after 2s
+                        showConfirmButton: false
+                    });
+                },
+                complete: function () {
+                    const btn = document.getElementById("saveSettingsBtn");
+                    btn.disabled = false;
+                },
+                success: function (response) {
+                    Swal.fire({
+                        title: 'Success!',
+                        text: response.message,
+                        icon: 'success',
+                        background: '#2f2f2f',  // dark background
+                        color: '#fff',           // text color
+                        timer: 2000,       // auto-close after 2s
+                        showConfirmButton: false
+                    });
+                }
+            });
+        }
+    });
+</script>
+

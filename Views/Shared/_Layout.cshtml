@@ -1,0 +1,120 @@
+﻿@{
+    var tenantId = User.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid")?.Value;
+}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <title>Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/infolist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/checklist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/button.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/darktableeditable.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/swaldarkmode.css" asp-append-version="true" />
+
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@*      custom CSS must be loaded AFTER Select2’s CSS.*@  
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="~/css/blackmodelselect.css" />
+</head>
+<body>
+    <div class="login-page">
+    <header class="app-header">
+        <nav class="app-nav">
+            <!-- LEFT SIDE (tabs) -->
+            <ul class="nav app-tabs">
+                <li class="nav-item brand">
+                    <span class="logo">◎</span>
+                    <span class="app-title">Orchestrator Portal</span>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       asp-controller="Home"
+                       asp-action="CreateProjects">
+                        Create Azure project
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                           asp-controller="Settings"
+                       asp-action="Index">
+                        Settings
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                        asp-controller="Resource"
+                           asp-action="Index">
+                        Resources
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                        asp-controller="ServiceConnection"
+                        asp-action="Index">
+                        Service Connection
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                        asp-controller="ResourceAssociation"
+                        asp-action="Index">
+                            Resources Mapping
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                        asp-controller="VariableGroups"
+                        asp-action="Index">
+                        Variables groups
+                    </a>
+                </li>
+
+            </ul>
+
+            <!-- RIGHT SIDE -->
+            <div class="nav-right">
+                <table>
+                    <tr>
+                        <td>
+                            @if (tenantId != null && tenantId != "9188040d-6c67-4c5b-b112-36a304b66dad")
+                            {
+                                <span class="user-info">
+                                    Tenant ID: <strong>@tenantId</strong>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="user-info">
+                                    Tenant ID: Personal Microsoft account (No Tenant)
+                                </span>
+                            }
+
+                            <span class="user-info">
+                                Logged in as <strong>@User.Identity?.Name</strong>
+                            </span>
+                        </td>
+                        <td><a class="logout-link" href="/Account/Logout">Logout</a> </td>
+                    </tr>
+                </table>                  
+            </div>
+        </nav>
+    </header>
+
+    <main class="app-content">
+        @RenderBody()
+    </main>
+    </div>
+
+</body>
+</html>

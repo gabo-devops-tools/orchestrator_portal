@@ -1,0 +1,338 @@
+﻿@using orchestrator_portal.Dto
+@model ResourceAssociationListVm
+@{
+    ViewData["Title"] = "Resource Association";
+}
+
+<h2>Resource Association</h2>
+
+<div class="action-grid">
+    <a asp-controller="ResourceAssociation"
+        asp-action="Index"
+        asp-route-mode="infra"
+    class="action-card action-btn">
+        🔧 Infra
+    </a>
+
+    <a asp-controller="ResourceAssociation"
+        asp-action="Index"
+        asp-route-mode="code"
+    class="action-card action-btn">
+        💻 Code
+    </a>
+</div>
+
+<h2>@Model.Mode Repo</h2>
+
+<button type="button" id="addResourceBtn" class="action-btn">
+    Add Resource Association
+</button>
+
+<table class="tomodify table table-striped table-dark-editable">
+    <thead>
+        <tr>
+            <th>Resource Name</th>
+            <th>ServiceConnection  Suffix</th>
+
+            <th>Resource Rbac (Read Only)</th>
+            <th>Resource Type (Read Only)</th>
+            <th>ServiceConnection Description (Read Only)</th>
+
+            <th></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.Rows)
+        {
+            <tr>
+                <input type="hidden" name="Id" value="@item.Id" />
+                <td class="rbac-class">
+                    <select name="ResourceId" class="form-select resource-select">
+                        @foreach (var resource in Model.Resources)
+                        {
+                            <option value="@resource.Id" data-rbac="@resource.Rbac" data-type="@resource.type"
+                                    selected="@(resource.Id == item.ResourceId)"> @resource.Name </option>
+                        }
+                    </select>
+                </td>
+                <td class="rbac-class">
+                    <select name="ServiceConnectionId" class="form-select sc-select">
+                        @foreach (var value in Model.ServiceConnection)
+                        {
+                            <option value="@value.Id" data-description="@value.Description"
+                                    selected="@(value.Id == item.ServiceConnectionId)"> @value.Name </option>
+                        }
+                    </select>
+                </td>
+                <td>
+                    <input type="text" class="form-control resource-rbac-input"
+                           value="@item.ResourceRbac"
+                           readonly />
+                </td>
+                <td>
+                    <input type="text" class="form-control resouce-type-input"
+                           value="@item.ResourceType"
+                           readonly />
+                </td>
+                <td>
+                    <input type="text" class="form-control serviceconnection-description-input"
+                           value="@item.ServiceConnectionDescription"
+                           readonly />
+                </td>
+                <td class="td-button">
+                    <button type="submit" class="action-btn saveRowBtn">Update</button>
+                </td>
+                <td class="td-button">
+                    <button type="submit" class="action-btn removeRowBtn">X</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+<table style="display:none">
+    <tbody>
+        <tr id="resource-row-template">
+            <input type="hidden" name="Id" value="0" />
+            <td class="rbac-class">
+                <select name="ResourceId" class="form-dynamic-select resource-select">
+                    @foreach (var resource in Model.Resources)
+                    {
+                        <option value="@resource.Id" data-rbac="@resource.Rbac" data-type="@resource.type">@resource.Name</option>
+                    }
+                </select>
+            </td>
+            <td class="type-class">
+                <select name="ServiceConnectionId" class="form-dynamic-select sc-select">
+                    @foreach (var value in Model.ServiceConnection)
+                    {
+                        <option value="@value.Id" data-description="@value.Description">@value.Name</option>
+                    }
+                </select>
+            </td>
+            <td>
+                <input type="text" class="form-control resource-rbac-input"
+                       value=""
+                       readonly />
+            </td>
+            <td>
+                <input type="text" class="form-control  resouce-type-input"
+                       value=""
+                       readonly />
+            </td>
+            <td>
+                <input type="text" class="form-control serviceconnection-description-input"
+                       value=""
+                       readonly />
+            </td>
+            <td class="td-button">
+                <button type="submit" class="action-btn saveRowBtn">Save</button>
+            </td>
+            <td class="td-button">
+                <button type="button" class="action-btn CancelRowBtn">X</button>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<button type="button" id="UpdateAllBtn" class="action-btn">
+    Update All Resource
+</button>
+
+<script>
+
+    $(document).ready(function () {
+         $('.form-select').select2({
+            width: '100%'
+        });
+
+        // Listen to selection
+        $('.resource-select').on('select2:select', async function(e){
+            // Only save if it's a new tag
+            const row = e.target.closest("tr");
+            const selected = e.target.selectedOptions[0];
+            const rbac = selected.dataset.rbac || "";
+            const type = selected.dataset.type || "";
+            row.querySelector(".resource-rbac-input").value = rbac;
+            row.querySelector(".resouce-type-input").value = type;
+        });
+
+        $('.sc-select').on('select2:select', async function(e){
+            // Only save if it's a new tag
+            const row = e.target.closest("tr");
+            const selected = e.target.selectedOptions[0];
+            const description = selected.dataset.description || "";
+            row.querySelector(".serviceconnection-description-input").value = description;
+        });
+
+        $(document).on('click', '.saveRowBtn', function () {
+            const $row = $(this).closest('tr');
+
+            const payload = {
+                Id : $row.find('input[name="Id"]').val(),
+                ResourceId: $row.find('select[name="ResourceId"]').val(),
+                ServiceConnectionId: $row.find('select[name="ServiceConnectionId"]').val(),
+                AzureResourceId: ""
+            };
+
+            $.ajax({
+                url: '/ResourceAssociation/Save',
+                type: 'POST',
+                data: payload,
+                success: function () {
+                    //alert('Saved!');
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Save failed');
+                }
+            });
+        });
+
+        $(document).on('click', '.CancelRowBtn', function () {
+             location.reload();
+        })
+
+        $(document).on('click', '.removeRowBtn', function () {
+            const $row = $(this).closest('tr');
+
+             const payload = {
+                Id : $row.find('input[name="Id"]').val()
+            };
+
+            $.ajax({
+                url: '/ResourceAssociation/Delete',
+                type: 'POST',
+                data: payload,
+                success: function () {
+                    //alert('Saved!');
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Save failed');
+                }
+            });
+        })
+
+        $('#addResourceBtn').on('click', function () {
+            const $template = $('#resource-row-template').clone();
+            $template.removeAttr('id');
+            $template.show();
+            const row = $template[0];
+
+            $('table.tomodify tbody').append($template);
+
+            $('.form-dynamic-select').select2({
+                width: '100%'
+            });
+            $('#addResourceBtn').prop('disabled', true);
+            $('#UpdateAllBtn').prop('disabled', true);
+
+            updateResourceFields(row);
+            updateServiceConnectionFields(row);
+
+            $('.resource-select').on('select2:select', async function(e){
+                // Only save if it's a new tag
+                const row = e.target.closest("tr");
+                const selected = e.target.selectedOptions[0];
+                const rbac = selected.dataset.rbac || "";
+                const type = selected.dataset.type || "";
+                row.querySelector(".resource-rbac-input").value = rbac;
+                row.querySelector(".resouce-type-input").value = type;
+            });
+
+            $('.sc-select').on('select2:select', async function(e){
+                // Only save if it's a new tag
+                const row = e.target.closest("tr");
+                const selected = e.target.selectedOptions[0];
+                const description = selected.dataset.description || "";
+                row.querySelector(".serviceconnection-description-input").value = description;
+            });
+
+        });
+
+        $(document).on('click', '#UpdateAllBtn', function () {
+            const resources = [];
+            let hasError = false;
+
+            $('table.tomodify tbody tr').each(function () {
+                const $row = $(this);
+
+                resourceId = $row.find('select[name="ResourceId"]').val();
+                serviceConnectionId = $row.find('select[name="ServiceConnectionId"]').val();
+
+                if (!resourceId || !serviceConnectionId) {
+                    hasError = true;
+                    return false; // break .each()
+                }
+
+                // Skip empty template rows if any
+                const id = $row.find('input[name="Id"]').val();
+                if (!id) return;
+                resources.push({
+                    Id: id,
+                    ResourceId: resourceId,
+                    ServiceConnectionId: serviceConnectionId,
+                    AzureResourceId: ""
+                });
+            });
+
+            if (hasError) {
+                Swal.fire({
+                    title: 'Missing information',
+                    text: 'Please fill in all fields before updating.',
+                    icon: 'warning',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    showConfirmButton: true
+                });
+                return;
+            }
+
+            if (resources.length === 0) {
+                Swal.fire({
+                    title: 'Nothing to update',
+                    text: 'No valid resources were found.',
+                    icon: 'info',
+                    background: '#2f2f2f',
+                    color: '#fff'
+                });
+                return;
+            }
+
+            $.ajax({
+                url: '/ResourceAssociation/UpdateAll',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(resources),
+                success: function () {
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Update all failed');
+                }
+            });
+       });
+
+    })
+
+    function updateResourceFields(row) {
+        const select = row.querySelector('.resource-select');
+        if (!select || !select.selectedOptions.length) return;
+
+        const selected = select.selectedOptions[0];
+        row.querySelector('.resource-rbac-input').value = selected.dataset.rbac || '';
+        row.querySelector('.resouce-type-input').value = selected.dataset.type || '';
+    }
+
+    function updateServiceConnectionFields(row) {
+        const select = row.querySelector('.sc-select');
+        if (!select || !select.selectedOptions.length) return;
+
+        const selected = select.selectedOptions[0];
+        row.querySelector('.serviceconnection-description-input').value =
+            selected.dataset.description || '';
+    }
+</script>

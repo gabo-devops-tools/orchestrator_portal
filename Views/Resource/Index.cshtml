@@ -1,0 +1,307 @@
+﻿@using orchestrator_portal.Dto
+@model ResourceListVm
+
+<h2>Resources</h2>
+<ul class="info-list">
+    <li> * Changes in resource repository usability will detach them from all existing resource association if is neccesary </li>
+</ul>
+<hr />
+<button type="button" id="addResourceBtn" class="action-btn">
+    Add Resource
+</button>
+
+<table class="tomodify table table-striped table-dark-editable">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Rbac</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Apply for @RepoType.Infra</th>
+            <th>Apply for @RepoType.Code</th>
+            <th></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.Resources)
+        {
+            <tr>
+                <input type="hidden" name="Id" value="@item.Id" />
+                <td>
+                    <input type="text"
+                           name="Name"
+                           value="@item.Name"
+                           class="form-control" />
+                </td>
+                <td class="select-cell">
+                    <select name="Rbac" class="form-select">
+                         @foreach (var rbac in Model.RbacOptions)
+                        {
+                             <option value="@rbac" selected="@(rbac == item.Rbac)"> @rbac </option>
+                         }
+                    </select>
+                </td>
+                <td class="select-cell">
+                    <select name="Type" class="form-select">
+                        @foreach (var type in Model.typeOptions)
+                        {
+                            <option value="@type" selected="@(type == item.type)"> @type </option>
+                        }
+                    </select>
+                </td>
+                <td>
+                    <input type="text"
+                           name="Description"
+                           value="@item.Description"
+                           class="form-control" />
+                </td>
+                <td class="checkbox-cell">
+                    <input type="checkbox"
+                           name="applyforinfra"
+                           value="true"
+                           @(item.applyforinfra ? "checked" : "") />
+                </td>
+                <td class="checkbox-cell">
+                    <input type="checkbox"
+                           name="applyforcode"
+                           value="true"
+                           @(item.applyforcode ? "checked" : "") />
+                </td>
+                <td class="td-button">
+                    <button type="submit" class="action-btn saveRowBtn">Update</button>
+                </td>
+                <td class="td-button">
+                    <button type="submit" class="action-btn removeRowBtn">X</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<button type="button" id="UpdateAllBtn" class="action-btn">
+    Update All Resource
+</button>
+
+<table style="display:none">
+    <tbody>
+        <tr id="resource-row-template">
+            <input type="hidden" name="Id" value="0" />
+
+            <td>
+                <input type="text" name="Name" class="form-control" />
+            </td>
+            <td class="select-cell">
+                <select name="Rbac" class="form-dynamic-select">
+                    @foreach (var rbac in Model.RbacOptions)
+                    {
+                        <option value="@rbac">@rbac</option>
+                    }
+                </select>
+            </td>
+            <td class="select-cell">
+                <select name="Type" class="form-dynamic-select">
+                    @foreach (var type in Model.typeOptions)
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+            </td>
+            <td>
+                <input type="text" name="Description" class="form-control" />
+            </td>
+            <td class="text-center checkbox-cell">
+                <input type="checkbox" name="applyforinfra" value="false" />
+            </td>
+            <td class="text-center checkbox-cell">
+                <input type="checkbox" name="applyforcode" value="false" />
+            </td>
+            <td class="td-button">
+                <button type="submit" class="action-btn saveRowBtn">Save</button>
+            </td>
+            <td class="td-button">
+                <button type="button" class="action-btn CancelRowBtn">X</button>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<script>
+    $(document).ready(function () {
+         $('.form-select').select2({
+            width: '100%'
+        });
+
+        $(document).on('click', '.saveRowBtn', function () {
+            let hasError = false;
+            const $row = $(this).closest('tr');
+
+            const name = $row.find('input[name="Name"]').val();
+            const description = $row.find('input[name="Description"]').val();
+            const Rbac =  $row.find('select[name="Rbac"]').val();
+            const type = $row.find('select[name="Type"]').val();
+
+            if (!name || !description || !Rbac || !type) {
+                Swal.fire({
+                    title: 'Missing information',
+                    text: 'Please fill in all fields before updating.',
+                    icon: 'warning',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    showConfirmButton: true
+                });
+                return;
+            }
+
+            const payload = {
+                Id : $row.find('input[name="Id"]').val(),
+                Name: name,
+                Description: description,
+                Rbac: Rbac,
+                type: type,
+                applyforinfra: $row.find('input[name="applyforinfra"]').is(':checked'),
+                applyforcode: $row.find('input[name="applyforcode"]').is(':checked')
+            };
+
+            $.ajax({
+                url: '/Resource/Save',
+                type: 'POST',
+                data: payload,
+                success: function () {
+                    //alert('Saved!');
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Save failed');
+                    Swal.fire({
+                        title: 'Duplicate Value',
+                        text: 'Name already exists.',
+                        icon: 'error',
+                        background: '#2f2f2f',
+                        color: '#fff',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            });
+        });
+
+
+         $(document).on('click', '.CancelRowBtn', function () {
+             location.reload();
+         })
+
+         $(document).on('click', '.removeRowBtn', function () {
+            const $row = $(this).closest('tr');
+             const payload = {
+                Id : $row.find('input[name="Id"]').val()
+            };
+
+            $.ajax({
+                url: '/Resource/Delete',
+                type: 'POST',
+                data: payload,
+                success: function () {
+                    //alert('Saved!');
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Save failed');
+                }
+            });
+         })
+
+       $('#addResourceBtn').on('click', function () {
+            const $template = $('#resource-row-template').clone();
+            $template.removeAttr('id');
+            $template.show();
+
+            $('table.tomodify tbody').append($template);
+
+            $('.form-dynamic-select').select2({
+                width: '100%'
+            });
+            $('#addResourceBtn').prop('disabled', true);
+            $('#UpdateAllBtn').prop('disabled', true);
+       });
+
+       $('#UpdateAllBtn').on('click', function () {
+            const resources = [];
+            let hasError = false;
+
+            $('table.tomodify tbody tr').each(function () {
+                const $row = $(this);
+
+                // Skip empty template rows if any
+                const id = $row.find('input[name="Id"]').val();
+                if (!id) return;
+
+                const name = $row.find('input[name="Name"]').val();
+                const description = $row.find('input[name="Description"]').val();
+                const Rbac =  $row.find('select[name="Rbac"]').val();
+                const type = $row.find('select[name="Type"]').val();
+
+                if (!name || !description || !Rbac || !type) {
+                    hasError = true;
+                    return false; // break .each()
+                }
+
+                resources.push({
+                    Id: id,
+                    Name: name,
+                    Description: description,
+                    Rbac: Rbac,
+                    type: type,
+                    applyforinfra: $row.find('input[name="applyforinfra"]').is(':checked'),
+                    applyforcode: $row.find('input[name="applyforcode"]').is(':checked')
+                });
+            });
+
+            if (hasError) {
+                Swal.fire({
+                    title: 'Missing information',
+                    text: 'Please fill in all fields before updating.',
+                    icon: 'warning',
+                    background: '#2f2f2f',
+                    color: '#fff',
+                    showConfirmButton: true
+                });
+                return;
+            }
+
+            if (resources.length === 0) {
+                Swal.fire({
+                    title: 'Nothing to update',
+                    text: 'No valid resources were found.',
+                    icon: 'info',
+                    background: '#2f2f2f',
+                    color: '#fff'
+                });
+                return;
+            }
+
+
+            $.ajax({
+                url: '/Resource/UpdateAll',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(resources),
+                success: function () {
+                    location.reload();
+                },
+                error: function () {
+                    //alert('Update all failed');
+                    Swal.fire({
+                        title: 'Duplicate Value',
+                        text: 'Name already exists.',
+                        icon: 'error',
+                        background: '#2f2f2f',
+                        color: '#fff',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            });
+       });
+    })
+</script>

@@ -1,0 +1,43 @@
+﻿.action-btn {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    margin-left: 5px;
+    margin-right: 5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+}
+
+    /* hover */
+    .action-btn:hover {
+        background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+        box-shadow: 0 6px 14px rgba(37, 99, 235, 0.45);
+        transform: translateY(-1px);
+    }
+
+    /* active (click) */
+    .action-btn:active {
+        transform: translateY(0);
+        box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
+    }
+
+    /* focus (keyboard navigation) */
+    .action-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.5);
+    }
+
+    /* disabled state */
+    .action-btn:disabled {
+        background: #374151;
+        color: #9ca3af;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
